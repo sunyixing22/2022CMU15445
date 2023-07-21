@@ -1,3 +1,12 @@
+/*
+ * @Author: sunyixing22 1400945253@qq.com
+ * @Date: 2023-06-08 21:48:20
+ * @LastEditors: sunyixing22 1400945253@qq.com
+ * @LastEditTime: 2023-06-29 21:06:49
+ * @FilePath: /bustub-20221128-2022fall/src/include/storage/page/b_plus_tree_leaf_page.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
+ * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 //===----------------------------------------------------------------------===//
 //
 //                         CMU-DB Project (15-445/645)
@@ -49,10 +58,23 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto GetNextPageId() const -> page_id_t;
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
+  auto GetItem(int index) -> const MappingType &;
+  auto KeyIndex(const KeyType &key, const KeyComparator &comparator) const -> int;
+  auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &keyComparator) -> int;
+  auto Lookup(const KeyType &key, ValueType *value, const KeyComparator &comparator) const -> bool;
+  auto RemoveAndDeleteRecord(const KeyType &key, const KeyComparator &keyComparator) -> int;
+
+  void MoveHalfTo(BPlusTreeLeafPage *recipient);
+  void MoveAllTo(BPlusTreeLeafPage *recipent);
+  void MoveFirstToEndOf(BPlusTreeLeafPage *recipient);
+  void MoveLastToFrontOf(BPlusTreeLeafPage *recipient);
 
  private:
   page_id_t next_page_id_;
   // Flexible array member for page data.
   MappingType array_[1];
+  void CopyNFrom(MappingType *items, int size);
+  void CopyLastFrom(const MappingType &item);
+  void CopyFirstFrom(const MappingType &item);
 };
 }  // namespace bustub

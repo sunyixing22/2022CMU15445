@@ -12,7 +12,7 @@
 
 #include "buffer/buffer_pool_manager_instance.h"
 #include <cstddef>
-#include <mutex>
+// #include <mutex>
 
 #include "common/config.h"
 #include "common/exception.h"
@@ -33,10 +33,10 @@ BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, DiskManag
     free_list_.emplace_back(static_cast<int>(i));
   }
 
-  // TODO(students): remove this line after you have implemented the buffer pool manager
-  throw NotImplementedException(
-      "BufferPoolManager is not implemented yet. If you have finished implementing BPM, please remove the throw "
-      "exception line in `buffer_pool_manager_instance.cpp`.");
+  // // TODO(students): remove this line after you have implemented the buffer pool manager
+  // throw NotImplementedException(
+  //     "BufferPoolManager is not implemented yet. If you have finished implementing BPM, please remove the throw "
+  //     "exception line in `buffer_pool_manager_instance.cpp`.");
 }
 
 BufferPoolManagerInstance::~BufferPoolManagerInstance() {
@@ -166,9 +166,35 @@ auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
   return true;
 }
 
-void BufferPoolManagerInstance::FlushAllPgsImp() {}
+void BufferPoolManagerInstance::FlushAllPgsImp() {
+  std::scoped_lock<std::mutex> lock(latch_);
+  for (size_t frame_id = 0; frame_id < pool_size_; ++frame_id) {
+    FlushPgImp(pages_[frame_id].GetPageId());
+  }
+}
 
-auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool { return false; }
+auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
+  std::scoped_lock<std::mutex> lock(latch_);
+
+  frame_id_t frame_id;
+  if (!page_table_->Find(page_id, frame_id)) {
+    return true;
+  }
+  if (pages_[frame_id].GetPinCount() > 0) {
+    return false;
+  }
+  replacer_->Remove(frame_id);
+
+  pages_[frame_id].ResetMemory();
+  pages_[frame_id].page_id_ = INVALID_PAGE_ID;
+  pages_[frame_id].pin_count_ = 0;
+  pages_[frame_id].is_dirty_ = false;
+
+  page_table_->Remove(page_id);
+  free_list_.push_back(frame_id);
+  DeallocatePage(page_id);
+  return true;
+}
 
 auto BufferPoolManagerInstance::AllocatePage() -> page_id_t { return next_page_id_++; }
 

@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <limits>
 #include <list>
 #include <mutex>  // NOLINT
@@ -88,7 +89,8 @@ class LRUKReplacer {
   /**
    * TODO(P1): Add implementation
    *
-   * @brief Toggle whether a frame is evictable or non-evictable. This function also
+   * @brief
+      Toggle whether a frame is evictable or non-evictable. This function also
    * controls replacer's size. Note that size is equal to number of evictable entries.
    *
    * If a frame was previously evictable and is to be set to non-evictable, then size should
@@ -136,10 +138,18 @@ class LRUKReplacer {
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.
   [[maybe_unused]] size_t current_timestamp_{0};
-  [[maybe_unused]] size_t curr_size_{0};
-  [[maybe_unused]] size_t replacer_size_;
-  [[maybe_unused]] size_t k_;
+  size_t curr_size_{0};
+  size_t replacer_size_;
+  size_t k_;
   std::mutex latch_;
+  std::vector<bool> is_evictable_;
+  std::unordered_map<int, size_t> access_count_;
+
+  std::list<frame_id_t> history_list_;
+  std::unordered_map<frame_id_t, std::list<int>::iterator> history_map_;
+
+  std::list<frame_id_t> cache_list_;
+  std::unordered_map<frame_id_t, std::list<int>::iterator> cache_map_;
 };
 
 }  // namespace bustub

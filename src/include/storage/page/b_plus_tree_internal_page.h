@@ -1,3 +1,12 @@
+/*
+ * @Author: sunyixing22 1400945253@qq.com
+ * @Date: 2023-06-08 21:48:20
+ * @LastEditors: sunyixing22 1400945253@qq.com
+ * @LastEditTime: 2023-06-28 20:26:45
+ * @FilePath: /bustub-20221128-2022fall/src/include/storage/page/b_plus_tree_internal_page.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
+ * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 //===----------------------------------------------------------------------===//
 //
 //                         CMU-DB Project (15-445/645)
@@ -41,9 +50,27 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   auto KeyAt(int index) const -> KeyType;
   void SetKeyAt(int index, const KeyType &key);
   auto ValueAt(int index) const -> ValueType;
+  void SetValueAt(int index, const ValueType &value);
+  auto ValueIndex(const ValueType &value) const -> int;
+
+  auto Lookup(const KeyType &key, const KeyComparator &comparator) const -> ValueType;
+  void PopulateNewRoot(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value);
+  auto InsertNodeAfter(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value) -> int;
+  void Remove(int index);
+  auto RemoveAndReturnOnlyChild() -> ValueType;
+
+  void MoveAllTo(BPlusTreeInternalPage *recipient, const KeyType &middle_key, BufferPoolManager *buffer_pool_manager);
+  void MoveHalfTo(BPlusTreeInternalPage *recipient, BufferPoolManager *buffer_pool_manager);
+  void MoveFirstToEndOf(BPlusTreeInternalPage *recipient, const KeyType &middle_key,
+                        BufferPoolManager *buffer_pool_manager);
+  void MoveLastToFrontOf(BPlusTreeInternalPage *recipient, const KeyType &middle_key,
+                         BufferPoolManager *buffer_pool_manager);
 
  private:
   // Flexible array member for page data.
   MappingType array_[1];
+  void CopyNFrom(MappingType *items, int size, BufferPoolManager *buffer_pool_manager);
+  void CopyLastFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager);
+  void CopyFirstFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager);
 };
 }  // namespace bustub
