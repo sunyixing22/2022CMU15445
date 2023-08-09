@@ -1,3 +1,12 @@
+/*
+ * @Author: sunyixing22 1400945253@qq.com
+ * @Date: 2023-06-08 21:48:20
+ * @LastEditors: sunyixing22 1400945253@qq.com
+ * @LastEditTime: 2023-08-09 15:35:15
+ * @FilePath: /bustub-20221128-2022fall/src/execution/aggregation_executor.cpp
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
+ * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 //===----------------------------------------------------------------------===//
 //
 //                         BusTub
@@ -18,11 +27,38 @@ namespace bustub {
 
 AggregationExecutor::AggregationExecutor(ExecutorContext *exec_ctx, const AggregationPlanNode *plan,
                                          std::unique_ptr<AbstractExecutor> &&child)
-    : AbstractExecutor(exec_ctx) {}
+    : AbstractExecutor(exec_ctx),
+      plan_(plan),
+      child_(std::move(child)),
+      aht_(plan_->aggregates_, plan_->agg_types_),
+      aht_iterator_(aht_.Begin()) {}
 
-void AggregationExecutor::Init() {}
+void AggregationExecutor::Init() {
+  child_->Init();
+  Tuple tuple{};
+  RID rid{};
+  while (child_->Next(&tuple, &rid)) {
+    aht_.InsertCombine(MakeAggregateKey(&tuple), MakeAggregateValue(&tuple));
+  }
+  if (aht_.Size() == 0 && GetOutputSchema().GetColumnCount() == 1) {
+    aht_.InsertIntialCombine();
+  }
+  aht_iterator_ = aht_.Begin();
+}
 
-auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool { return false; }
+auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool {
+  if (aht_iterator_ == aht_.End()) {
+    return false;
+  }
+  std::vector<Value> values;
+
+  values.insert(values.end(), aht_iterator_.Key().group_bys_.begin(), aht_iterator_.Key().group_bys_.end());
+  values.insert(values.end(), aht_iterator_.Val().aggregates_.begin(), aht_iterator_.Val().aggregates_.end());
+  *tuple = Tuple{values, &GetOutputSchema()};
+  ++aht_iterator_;
+
+  return true;
+}
 
 auto AggregationExecutor::GetChildExecutor() const -> const AbstractExecutor * { return child_.get(); }
 

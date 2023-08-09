@@ -2,7 +2,7 @@
  * @Author: sunyixing22 1400945253@qq.com
  * @Date: 2023-06-08 21:48:20
  * @LastEditors: sunyixing22 1400945253@qq.com
- * @LastEditTime: 2023-07-18 21:25:51
+ * @LastEditTime: 2023-08-09 15:11:04
  * @FilePath: /bustub-20221128-2022fall/src/execution/insert_executor.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
  * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
@@ -19,28 +19,29 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <algorithm>
-#include <cstdint>
 #include <memory>
-#include <utility>
-#include <vector>
 
-#include "catalog/catalog.h"
 #include "execution/executors/insert_executor.h"
-#include "storage/table/tuple.h"
-#include "type/type.h"
-#include "type/type_id.h"
 
 namespace bustub {
 
 InsertExecutor::InsertExecutor(ExecutorContext *exec_ctx, const InsertPlanNode *plan,
                                std::unique_ptr<AbstractExecutor> &&child_executor)
-    : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)) {
+    : AbstractExecutor(exec_ctx), plan_{plan}, child_executor_{std::move(child_executor)} {
   this->table_info_ = this->exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_);
 }
 
 void InsertExecutor::Init() {
   child_executor_->Init();
+  try {
+    bool is_locked = exec_ctx_->GetLockManager()->LockTable(
+        exec_ctx_->GetTransaction(), LockManager::LockMode::INTENTION_EXCLUSIVE, table_info_->oid_);
+    if (!is_locked) {
+      throw ExecutionException("Insert Executor Get Table Lock Failed");
+    }
+  } catch (TransactionAbortException &e) {
+    throw ExecutionException("Insert Executor Get Table Lock Failed");
+  }
   table_indexes_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
 }
 
@@ -54,7 +55,18 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
 
   while (child_executor_->Next(&to_insert_tuple, &emit_rid)) {
     bool inserted = table_info_->table_->InsertTuple(to_insert_tuple, rid, exec_ctx_->GetTransaction());
+
     if (inserted) {
+      try {
+        bool is_locked = exec_ctx_->GetLockManager()->LockRow(
+            exec_ctx_->GetTransaction(), LockManager::LockMode::EXCLUSIVE, table_info_->oid_, *rid);
+        if (!is_locked) {
+          throw ExecutionException("Insert Executor Get Row Lock Failed");
+        }
+      } catch (TransactionAbortException &e) {
+        throw ExecutionException("Insert Executor Get Row Lock Failed");
+      }
+
       std::for_each(table_indexes_.begin(), table_indexes_.end(),
                     [&to_insert_tuple, &rid, &table_info = table_info_, &exec_ctx = exec_ctx_](IndexInfo *index) {
                       index->index_->InsertEntry(to_insert_tuple.KeyFromTuple(table_info->schema_, index->key_schema_,

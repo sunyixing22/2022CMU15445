@@ -1,3 +1,12 @@
+/*
+ * @Author: sunyixing22 1400945253@qq.com
+ * @Date: 2023-06-08 21:48:20
+ * @LastEditors: sunyixing22 1400945253@qq.com
+ * @LastEditTime: 2023-08-09 15:26:08
+ * @FilePath: /bustub-20221128-2022fall/src/include/execution/executors/hash_join_executor.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
+ * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 //===----------------------------------------------------------------------===//
 //
 //                         BusTub
@@ -13,8 +22,11 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
+#include "common/util/hash_util.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/hash_join_plan.h"
@@ -54,6 +66,14 @@ class HashJoinExecutor : public AbstractExecutor {
  private:
   /** The NestedLoopJoin plan node to be executed. */
   const HashJoinPlanNode *plan_;
+
+  std::unique_ptr<AbstractExecutor> left_executor_;
+  std::unique_ptr<AbstractExecutor> right_executor_;
+
+  std::unordered_map<hash_t, std::vector<Tuple>> hash_join_table_;
+
+  std::vector<Tuple> output_tuples_;
+  std::vector<Tuple>::const_iterator output_tuples_iter_;
 };
 
 }  // namespace bustub

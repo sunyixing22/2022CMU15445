@@ -2,7 +2,7 @@
  * @Author: sunyixing22 1400945253@qq.com
  * @Date: 2023-06-08 21:48:20
  * @LastEditors: sunyixing22 1400945253@qq.com
- * @LastEditTime: 2023-07-18 20:14:20
+ * @LastEditTime: 2023-08-09 15:06:08
  * @FilePath: /bustub-20221128-2022fall/src/execution/delete_executor.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
  * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
@@ -40,6 +40,15 @@ DeleteExecutor::DeleteExecutor(ExecutorContext *exec_ctx, const DeletePlanNode *
 
 void DeleteExecutor::Init() {
   child_executor_->Init();
+  try {
+    bool is_locked = exec_ctx_->GetLockManager()->LockTable(
+        exec_ctx_->GetTransaction(), LockManager::LockMode::INTENTION_EXCLUSIVE, table_info_->oid_);
+    if (!is_locked) {
+      throw ExecutionException("Delete Executor Get Table Lock Failed");
+    }
+  } catch (TransactionAbortException &e) {
+    throw ExecutionException("Delete Executor Get Table Lock Failed");
+  }
   table_indexes_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
 }
 
@@ -52,6 +61,15 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   int32_t delete_count = 0;
 
   while (child_executor_->Next(&to_delete_tuple, &emit_rid)) {
+    try {
+      bool is_locked = exec_ctx_->GetLockManager()->LockRow(
+          exec_ctx_->GetTransaction(), LockManager::LockMode::EXCLUSIVE, table_info_->oid_, emit_rid);
+      if (!is_locked) {
+        throw ExecutionException("Delete Executor Get Row Lock Failed");
+      }
+    } catch (TransactionAbortException &e) {
+      throw ExecutionException("Delete Executor Get Row Lock Failed");
+    }
     bool deleted = table_info_->table_->MarkDelete(emit_rid, exec_ctx_->GetTransaction());
     if (deleted) {
       std::for_each(table_indexes_.begin(), table_indexes_.end(),

@@ -1,3 +1,12 @@
+/*
+ * @Author: sunyixing22 1400945253@qq.com
+ * @Date: 2023-06-08 21:48:20
+ * @LastEditors: sunyixing22 1400945253@qq.com
+ * @LastEditTime: 2023-08-09 15:13:43
+ * @FilePath: /bustub-20221128-2022fall/src/include/execution/executors/nested_index_join_executor.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
+ * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 //===----------------------------------------------------------------------===//
 //
 //                         BusTub
@@ -50,5 +59,10 @@ class NestIndexJoinExecutor : public AbstractExecutor {
  private:
   /** The nested index join plan node. */
   const NestedIndexJoinPlanNode *plan_;
+
+  std::unique_ptr<AbstractExecutor> child_;
+  const IndexInfo *index_info_;
+  const TableInfo *table_info_;
+  BPlusTreeIndexForOneIntegerColumn *tree_;
 };
 }  // namespace bustub

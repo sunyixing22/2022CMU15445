@@ -1,9 +1,9 @@
 /*
  * @Author: sunyixing22 1400945253@qq.com
- * @Date: 2023-06-08 21:48:20
+ * @Date: 2023-06-06 21:40:34
  * @LastEditors: sunyixing22 1400945253@qq.com
- * @LastEditTime: 2023-07-18 19:32:23
- * @FilePath: /bustub-20221128-2022fall/src/execution/seq_scan_executor.cpp
+ * @LastEditTime: 2023-08-09 16:48:54
+ * @FilePath: /bustub-master/src/execution/seq_scan_executor.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
  * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -20,9 +20,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "execution/executors/seq_scan_executor.h"
-#include "common/exception.h"
-#include "concurrency/lock_manager.h"
-#include "concurrency/transaction.h"
 
 namespace bustub {
 
@@ -32,35 +29,53 @@ SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNod
 }
 
 void SeqScanExecutor::Init() {
-  //   if (exec_ctx_->GetTransaction()->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
-  //     try {
-  //       bool is_locked = exec_ctx_->GetLockManager()->LockTable(
-  //           exec_ctx_->GetTransaction(), LockManager::LockMode::INTENTION_SHARED, table_info_->oid_);
-  //       if (!is_locked) {
-  //         throw ExecutionException("SeqScan Executor Get Table Lock Failed");
-  //       }
-  //     } catch (TransactionAbortException &e) {
-  //       throw ExecutionException("SeqScan Executor Get Table Lock Failed" + e.GetInfo());
-  //     }
-  //   }
+  if (exec_ctx_->GetTransaction()->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+    try {
+      bool is_locked = exec_ctx_->GetLockManager()->LockTable(
+          exec_ctx_->GetTransaction(), LockManager::LockMode::INTENTION_SHARED, table_info_->oid_);
+      if (!is_locked) {
+        throw ExecutionException("SeqScan Executor Get Table Lock Failed");
+      }
+    } catch (TransactionAbortException &e) {
+      throw ExecutionException("SeqScan Executor Get Table Lock Failed" + e.GetInfo());
+    }
+  }
   this->table_iter_ = table_info_->table_->Begin(exec_ctx_->GetTransaction());
 }
 
 auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
-  //   do {
-  //     if (table_iter_ == table_info_->table_->End()) {
-  //       if (exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
-  //       }
-  //     }
-  //   }
+  do {
+    if (table_iter_ == table_info_->table_->End()) {
+      if (exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
+        const auto locked_row_set = exec_ctx_->GetTransaction()->GetSharedRowLockSet()->at(table_info_->oid_);
+        table_oid_t oid = table_info_->oid_;
+        for (auto rid : locked_row_set) {
+          exec_ctx_->GetLockManager()->UnlockRow(exec_ctx_->GetTransaction(), oid, rid);
+        }
 
-  if (table_iter_ != table_info_->table_->End()) {
+        exec_ctx_->GetLockManager()->UnlockTable(exec_ctx_->GetTransaction(), table_info_->oid_);
+      }
+      return false;
+    }
     *tuple = *table_iter_;
-    *rid = table_iter_->GetRid();
+    *rid = tuple->GetRid();
     ++table_iter_;
-    return true;
+  } while (plan_->filter_predicate_ != nullptr &&
+           !plan_->filter_predicate_->Evaluate(tuple, table_info_->schema_).GetAs<bool>());
+
+  if (exec_ctx_->GetTransaction()->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+    try {
+      bool is_locked = exec_ctx_->GetLockManager()->LockRow(exec_ctx_->GetTransaction(), LockManager::LockMode::SHARED,
+                                                            table_info_->oid_, *rid);
+      if (!is_locked) {
+        throw ExecutionException("SeqScan Executor Get Table Lock Failed");
+      }
+    } catch (TransactionAbortException &e) {
+      throw ExecutionException("SeqScan Executor Get Row Lock Failed");
+    }
   }
-  return false;
+
+  return true;
 }
 
 }  // namespace bustub
